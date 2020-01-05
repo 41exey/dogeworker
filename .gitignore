@@ -1,2 +1,6 @@
 # Virtualenv
 venv
+
+# Private data
+accaunts.json
+sessions
