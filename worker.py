@@ -105,6 +105,22 @@ logging.info(litecoin.id)
 
 loop = asyncio.get_event_loop()
 
+class Command(object):
+	
+	def __init__(self, command, message):
+		self.command = command
+		self.message = message
+
+	def getCommand(self):
+		return self.command
+
+	def getMessage(self):
+		return self.message
+
+import queue
+
+queue_command = queue.Queue()
+
 @client.on(events.NewMessage)
 async def handler(event):
 	sender = await event.get_sender()
@@ -120,24 +136,34 @@ async def handler(event):
 		global status
 		global status_double
 		global message
-		global start_command
-		global end_command
-		if "Press the 'Visit website' button to earn" in event.message.raw_text:
+		global start_command_time
+		global end_command_time
+		global queue_command
+		if "Press the \"Visit website\" button to earn" in event.message.raw_text:
 			logging.info("New message with link")
 			#print("New message with link")
 			status = commands["new"]
 			#print(event.message.buttons[0][0].url)
 			message = event.message
-			start_command = datetime.datetime.now()
+
+			queue_command.put(Command(commands["new"], event.message))
+
+			start_command_time = datetime.datetime.now()
 		if "You earned" in event.message.raw_text:
 			logging.info("You earned")
 			status = commands["earned"]
-			start_command = datetime.datetime.now()
+
+			queue_command.put(Command(commands["earned"], None))
+
+			start_command_time = datetime.datetime.now()
 		if "Sorry, there are no new ads available" in event.message.raw_text:
 			logging.info("No new ads")
 			status = commands["noads"]
 			status_double = commands["noads"]
-			start_command = datetime.datetime.now()
+
+			queue_command.put(Command(commands["noads"], None))
+
+			start_command_time = datetime.datetime.now()
 
 #client.send_message("Litecoin_click_bot", "Visit sites")
 
@@ -158,111 +184,93 @@ async def main():
 	await client.send_message("Litecoin_click_bot", "Visit sites")
 	timeout_flag = False
 	timeout = 60
-	global end_command
-	end_command = datetime.datetime.now()
+	global start_command_time
+	start_command_time = datetime.datetime.now()
+	global end_command_time
+	end_command_time = datetime.datetime.now()
 	while True:
-		global exitFlag
 		global status
-		if status == commands["new"]:
-			status = commands["none"]
-			global message
-			logging.info(message.buttons[0][0].url)
-			url = message.buttons[0][0].url
-			#print(message.buttons[0][0].url)
-########################################
+		global queue_command
 
-
-			from selenium import webdriver
-
-			chrome_options = webdriver.ChromeOptions()
-			chrome_options.add_argument("--headless")
-			chrome_options.add_argument("--window-size=1920,1080")
-			chrome_options.add_argument("--disable-gpu")
-			chrome_options.add_argument("--no-sandbox")
-			chrome_options.add_argument("--test-type")
-			chrome_options.add_argument("--disable-setuid-sandbox")
-			chrome_options.add_argument("--disable-infobars")
-
-#			url = "http://www.python.org"
-
-			caps = {"browserName": "chrome", "chromeOptions": "--headless"}
-			global driver
-
-			try:
-				driver.quit()
-			except NameError:
-				logging.info("First driver")
-			except:
-				logging.info("OOh My GOD")
-#			if driver is None:
-#				logging.info("First driver")
-#			else:
-#				driver.quit()
-
-			driver = webdriver.Remote(command_executor=f"http://localhost:4444/wd/hub", desired_capabilities=chrome_options.to_capabilities())
-			driver.get(url)
-			var = driver.find_elements_by_xpath("//*[contains(text(), 'reCAPTCHA')]")
-			if len(var) != 0:
-				logging.info("reCAPTCHA finded %s" % len(var))
-				#print("reCAPTCHA finded %s" % len(var))
-				driver.quit()
-				logging.info("Skipping task")
-				await message.click(1, 1)
-			else:
-				logging.info("reCAPTCHA don't find")
-				#print("reCAPTCHA don't find")
-				timeout = 60
-				timeout_flag = True
-				global start				
-				start = datetime.datetime.now()
-				global end
-				end = datetime.datetime.now()
-
-#exit when recived message			
-#driver.quit()
-
-
-########################################
-#			time.sleep(5)
-#			loop = asyncio.new_event_loop()
-#			asyncio.set_event_loop(loop)
-# Here not forward
+		if queue_command.empty() != True:
+			item = queue_command.get()
 			
-#			loop.close()
-#			if exitFlag:
-#				#threadName.exit()
-#				break
+			if item.command == commands["new"]:
+				status = commands["none"]
+				global message
+				logging.info(message.buttons[0][0].url)
+				url = message.buttons[0][0].url
+				from selenium import webdriver
+				chrome_options = webdriver.ChromeOptions()
+				chrome_options.add_argument("--headless")
+				chrome_options.add_argument("--window-size=1920,1080")
+				chrome_options.add_argument("--disable-gpu")
+				chrome_options.add_argument("--no-sandbox")
+				chrome_options.add_argument("--test-type")
+				chrome_options.add_argument("--disable-setuid-sandbox")
+				chrome_options.add_argument("--disable-infobars")
+				caps = {"browserName": "chrome", "chromeOptions": "--headless"}
+				global driver
 
-		if status == commands["earned"]:
-			status = commands["none"]
-			#global driver
-			try:
-				driver.quit()
-			except:
-				logging.info("driver.quit() bag")
-			timeout_flag = False
-			logging.info("Wait new visit message")
-			await client.send_message("Litecoin_click_bot", "Visit sites")
+				try:
+					driver.quit()
+				except NameError:
+					logging.info("First driver")
+				except:
+					logging.info("OOh My GOD")
 
-		if status == commands["noads"]:
-			start = datetime.datetime.now()
-			end = datetime.datetime.now()
-			status = commands["none"]
-			timeout_flag = True
+				driver = webdriver.Remote(command_executor=f"http://localhost:4444/wd/hub", desired_capabilities=chrome_options.to_capabilities())
+				driver.get(url)
+				var = driver.find_elements_by_xpath("//*[contains(text(), 'reCAPTCHA')]")
+				if len(var) != 0:
+					logging.info("reCAPTCHA finded %s" % len(var))
+					driver.quit()
+					logging.info("Skipping task")
+					await message.click(1, 1)
+				else:
+					logging.info("reCAPTCHA don't find")
+					timeout = 60
+					timeout_flag = True
+					global start_time				
+					start_time = datetime.datetime.now()
+					global end_time
+					end_time = datetime.datetime.now()
+
+
+			if item.command == commands["earned"]:
+				start_time = datetime.datetime.now()
+				end_time = datetime.datetime.now()
+				status = commands["none"]
+				try:
+					driver.quit()
+				except:
+					logging.info("driver.quit() bag")
+				timeout_flag = False
+				logging.info("Wait new visit message")
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# DONT'T PARSE TWO MESSAGE HERE
+#				await client.send_message("Litecoin_click_bot", "Visit sites")
+
+			if item.command == commands["noads"]:
+				start_time = datetime.datetime.now()
+				end_time = datetime.datetime.now()
+				status = commands["none"]
+				timeout_flag = True
 #will add random
-			import random
-#			timeout = 30
-			timeout = random.randint(120, 900)
-			logging.info("Wait %s seconds" % timeout)
-
-		#global end
-		#global start
+				import random
+				timeout = random.randint(120, 900)
+				logging.info("Wait %s seconds" % timeout)
+	
 # We don't know this variable if don't recived now command
+			
 		if timeout_flag == True:
-			logging.info("Counter %s" % (end - start).seconds)
-			if (end - start).seconds >= timeout:
+			logging.info("Counter %s" % (end_time - start_time).seconds)
+			if (end_time - start_time).seconds >= timeout:
 				#logging.info("status_double == %s" % status_double)
-				global status_double			
+				global status_double
+				start_command_time = datetime.datetime.now()
+				end_command_time = datetime.datetime.now()			
 				if status_double == commands["noads"]:
 					status_double = commands["none"]
 					timeout_flag = False
@@ -275,22 +283,22 @@ async def main():
 					driver.quit()
 					await message.click(1, 1)
 					timeout_flag = False
-
-		global start_command
+					#global start_command_time
 		
-		if (end_command - start_command).seconds >= 120 and timeout_flag == False:
-			start_command = datetime.datetime.now()
+		if (end_command_time - start_command_time).seconds >= 120 and timeout_flag == False:
+			start_command_time = datetime.datetime.now()
 			logging.info("Many long time don't be commands")
-			await client.send_message("Litecoin_click_bot", "Visit sites")
+##########################
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#			await client.send_message("Litecoin_click_bot", "Visit sites")
 		
-		logging.info("Main loop %s" % (end_command - start_command).seconds)
-		#print("Main loop")
-		#yield
-		#time.sleep(1)
+		if timeout_flag == False:
+			logging.info("Main loop %s" % (end_command_time - start_command_time).seconds)
+
 		await asyncio.sleep(1)
-		#global end
-		end = datetime.datetime.now()
-		end_command = end
+
+		end_time = datetime.datetime.now()
+		end_command_end = end_time
 
 #client.loop.create_task(handler())
 client.loop.create_task(main())
