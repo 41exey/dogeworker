@@ -106,7 +106,7 @@ logging.info(litecoin.id)
 loop = asyncio.get_event_loop()
 
 class Command(object):
-	
+	"""Container for received bot massages by separating by commands"""
 	def __init__(self, command, message):
 		self.command = command
 		self.message = message
