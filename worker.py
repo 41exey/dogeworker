@@ -117,6 +117,24 @@ class Command(object):
 	def getMessage(self):
 		return self.message
 
+class Sort_commands(object):
+	"""Sort commands by message.id"""
+	def __init__(self):
+		self.commands = []
+
+	def put(self, command):
+		self.commands.append(command)
+		self.commands.sort(key=lambda command: command.message.id)
+
+	def get(self):
+		if len(self.commands) > 0:
+			return self.commands.pop(0)
+
+	def empty(self):
+		return len(self.commands) == 0
+
+sorted_commands = Sort_commands()
+
 import queue
 
 queue_command = queue.Queue()
@@ -145,14 +163,14 @@ async def handler(event):
 			status = commands["new"]
 			#print(event.message.buttons[0][0].url)
 			message = event.message
-
+			sorted_commands.put(Command(commands["new"], event.message))
 			queue_command.put(Command(commands["new"], event.message))
 
 			start_command_time = datetime.datetime.now()
 		if "You earned" in event.message.raw_text:
 			logging.info("You earned")
 			status = commands["earned"]
-
+			sorted_commands.put(Command(commands["earned"], event.message))
 			queue_command.put(Command(commands["earned"], None))
 
 			start_command_time = datetime.datetime.now()
@@ -160,7 +178,7 @@ async def handler(event):
 			logging.info("No new ads")
 			status = commands["noads"]
 			status_double = commands["noads"]
-
+			sorted_commands.put(Command(commands["noads"], event.message))
 			queue_command.put(Command(commands["noads"], None))
 
 			start_command_time = datetime.datetime.now()
@@ -188,12 +206,18 @@ async def main():
 	start_command_time = datetime.datetime.now()
 	global end_command_time
 	end_command_time = datetime.datetime.now()
+
+	global sorted_commands
+
 	while True:
 		global status
 		global queue_command
 
-		if queue_command.empty() != True:
-			item = queue_command.get()
+		if not sorted_commands.empty():
+			item = sorted_commands.get()
+
+		#if queue_command.empty() != True:
+		#	item = queue_command.get()
 			
 			if item.command == commands["new"]:
 				status = commands["none"]
